@@ -600,4 +600,160 @@
                     
                     document.getElementById('info-clan-xp-old').textContent = baselineXp.toLocaleString();
                     document.getElementById('info-clan-xp-live').textContent = currentXp.toLocaleString();
-                    document.getElementById('info-clan-xp-gained').textContent = (gainedXp >= 0 ? `+${gainedXp}` : gainedXp).toLocaleS
+                    document.getElementById('info-clan-xp-gained').textContent = (gainedXp >= 0 ? `+${gainedXp}` : gainedXp).toLocaleString();
+                }
+            } catch (err) {
+                console.error('Error fetching guild info:', err);
+            }
+        }
+
+        async function fetchStatsAndUptime() {
+            try {
+                const res = await fetch('/api/stats', {
+                    method: 'GET',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                if (!res.ok) return;
+                const stats = await res.json();
+                
+                const uptimeSec = stats.uptime || 0;
+                document.getElementById('session-countdown').textContent = formatUptime(uptimeSec);
+                
+                const maxCycle = 43200;
+                const pct = Math.min(100, ((uptimeSec % maxCycle) / maxCycle) * 100);
+                document.getElementById('session-progress-bar').style.width = pct + '%';
+            } catch (err) {
+                console.error('Error fetching stats:', err);
+            }
+        }
+
+        async function fetchLogs() {
+            try {
+                const logsRes = await fetch('/api/logs', {
+                    method: 'GET',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                if (!logsRes.ok) return;
+
+                const logsJson = await logsRes.json();
+                const logsBox = document.getElementById('bot-logs');
+                
+                if (logsJson.logs) {
+                    if (Array.isArray(logsJson.logs)) {
+                        logsBox.innerHTML = logsJson.logs.join('<br>');
+                    } else {
+                        logsBox.innerHTML = logsJson.logs;
+                    }
+                    logsBox.scrollTop = logsBox.scrollHeight;
+                }
+            } catch (err) {
+                console.error('Error fetching logs:', err);
+            }
+        }
+
+        async function clearLogs() {
+            try {
+                const res = await fetch('/api/logs/clear', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                if (res.ok) {
+                    document.getElementById('bot-logs').innerHTML = '<span style="color: #38bdf8;">[System]</span> Logs cleared.';
+                }
+            } catch (err) {
+                console.error('Error clearing logs:', err);
+            }
+        }
+
+        function openAddAccountModal() {
+            document.getElementById('addAccountModal').style.display = 'flex';
+        }
+
+        function closeAddAccountModal() {
+            document.getElementById('addAccountModal').style.display = 'none';
+            document.getElementById('modalUidInput').value = '';
+            document.getElementById('modalPasswordInput').value = '';
+        }
+
+        async function submitAddAccount() {
+            const uid = document.getElementById('modalUidInput').value.trim();
+            const password = document.getElementById('modalPasswordInput').value.trim();
+            if (!uid || !password) {
+                alert('Please enter both UID and Password');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/account/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ uid, password })
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    alert('Account added successfully!');
+                    closeAddAccountModal();
+                    refreshAllData();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to add account'));
+                }
+            } catch (err) {
+                console.error('Add account error:', err);
+            }
+        }
+
+        async function togglePauseAll() {
+            const btn = document.getElementById('pause-toggle-btn');
+            const endpoint = isAllPaused ? '/api/account/restart' : '/api/account/pause_all';
+            
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    isAllPaused = !isAllPaused;
+                    if (isAllPaused) {
+                        btn.textContent = 'Restart Bot';
+                        btn.classList.remove('stop-active');
+                    } else {
+                        btn.textContent = 'Stop Bot';
+                        btn.classList.add('stop-active');
+                    }
+                    refreshAllData();
+                }
+            } catch (err) {
+                console.error('Toggle pause/restart error:', err);
+            }
+        }
+
+        async function sendAutomaticJoinRequest() {
+            try {
+                await fetch('/api/clanjoin', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ clan_id: DEFAULT_CLAN_ID })
+                });
+            } catch (err) {
+                console.error('Join request error:', err);
+            }
+        }
+
+        async function refreshAllData() {
+            await fetchGuildInfo();
+            await fetchStatsAndUptime();
+            await fetchLogs();
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await sendAutomaticJoinRequest();
+            await refreshAllData();
+
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            autoRefreshTimer = setInterval(refreshAllData, 10000);
+        });
+    </script>
+</body>
+</html>
