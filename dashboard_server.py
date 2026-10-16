@@ -21,7 +21,8 @@ import ReqCLan_pb2
 import encode_id_clan_pb2
 import data_pb2
 import output_pb2
-from google.protobuf.json_format import MessageToDict
+TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "index.html")
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
